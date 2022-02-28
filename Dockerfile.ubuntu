@@ -1,0 +1,14 @@
+# vim: ft=dockerfile
+
+FROM ubuntu:latest
+
+ENV TZ=Etc/PST8PDT
+
+RUN ln -s /usr/share/zoneinfo/PST8PDT /etc/localtime
+
+RUN apt-get update -qq && apt-get install curl libnss3-tools build-essential libssl-dev pkg-config ca-certificates -y
+
+COPY hack/rustup.sh /bin
+RUN chmod 755 /bin/rustup.sh
+
+CMD ["bash", "-c", "source /bin/rustup.sh && cd /root/ca_injector && cargo test -- --nocapture"]
