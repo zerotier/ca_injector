@@ -1,9 +1,9 @@
 DOCKER_IMAGE=ca-injector-test
-DOCKER_RUN=docker run -e RUST_BACKTRACE=full -it --rm -v ${PWD}:/root/ca_injector -v ${PWD}/.rustup:/root/.rustup -v ${PWD}/.cargo:/root/.cargo ${DOCKER_IMAGE}
+DOCKER_RUN_DEBIAN=docker run -e RUST_BACKTRACE=full -it --rm -v ${PWD}:/root/ca_injector -v ${PWD}/debian/.rustup:/root/.rustup -v ${PWD}/debian/.cargo:/root/.cargo ${DOCKER_IMAGE}:debian
 
 test: build
-	mkdir -p .cargo .rustup
-	${DOCKER_RUN}
+	mkdir -p debian rhel
+	${DOCKER_RUN_DEBIAN} 
 
 build:
-	docker build -t ${DOCKER_IMAGE} .
+	docker build -f Dockerfile.debian -t ${DOCKER_IMAGE}:debian .
