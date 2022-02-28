@@ -4,6 +4,8 @@ This library is a (as of this writing, incomplete) rust port of [mkcert](https:/
 
 Please see the [docs](https://docs.rs/crate/ca_injector/latest) for more information on use.
 
+Please also note that this library only supports injection into **Linux** trust stores as of this writing. It is planned soon to have OS X and Windows support.
+
 ## Author
 
 Erik Hollensbe <erik.hollensbe@zerotier.com>
