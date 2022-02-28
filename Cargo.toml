@@ -2,6 +2,7 @@
 name = "ca_injector"
 version = "0.1.0"
 edition = "2021"
+authors = ["Erik Hollensbe <git@hollensbe.org>", "Adam Ierymenko <adam.ierymenko@zerotier.com>"]
 license = "BSD-3-Clause"
 readme = "README.md"
 description = "Inject CAs into trust stores; port of mkcert to a library."
