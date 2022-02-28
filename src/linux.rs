@@ -207,15 +207,25 @@ pub fn uninstall_ca(filename: &str) -> Result<(), anyhow::Error> {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Once;
+
     use tempdir::TempDir;
+
+    static LOGGER: Once = Once::new();
+
+    fn init_logger() {
+        LOGGER.call_once(|| {
+            env_logger::builder()
+                .filter_level(log::LevelFilter::Debug)
+                .init();
+        })
+    }
 
     #[test]
     fn test_install() {
-        env_logger::builder()
-            .filter_level(log::LevelFilter::Debug)
-            .init();
-
         use coyote::acme::ca::CA;
+
+        init_logger();
 
         for filename in vec![
             "test.pem",
