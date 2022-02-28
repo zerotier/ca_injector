@@ -22,6 +22,3 @@ pub fn uninstall_ca(filename: &str) -> Result<(), anyhow::Error> {
         filename
     ))
 }
-
-#[cfg(test)]
-mod tests {}
