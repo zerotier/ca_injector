@@ -19,7 +19,7 @@ glob = "^0.3"
 log = "^0.4"
 
 [dev-dependencies]
-coyote = "*"
-openssl = "*"
-tempdir = "*"
-env_logger = "*"
+coyote = ">=0"
+openssl = ">=0"
+tempdir = ">=0"
+env_logger = ">=0"
