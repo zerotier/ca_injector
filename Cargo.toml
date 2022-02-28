@@ -2,6 +2,12 @@
 name = "ca_injector"
 version = "0.1.0"
 edition = "2021"
+license = "BSD-3-Clause"
+readme = "README.md"
+description = "Inject CAs into trust stores; port of mkcert to a library."
+repository = "https://github.com/zerotier/ca_injector"
+homepage = "https://github.com/zerotier/ca_injector"
+keywords = ["tls", "certificate", "zerotier"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
