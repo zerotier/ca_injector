@@ -166,16 +166,18 @@ fn get_trust_store_command() -> Result<TrustStoreMetadata, anyhow::Error> {
     Err(anyhow!("CA location could not be determined"))
 }
 
+fn tr_filename(filename: &str) -> String {
+    Path::new(filename)
+        .file_name()
+        .unwrap()
+        .to_string_lossy()
+        .replace(" ", "_")
+        .replace(".pem", ".crt")
+}
+
 fn template_filename(filename: &str, tsc: &TrustStoreMetadata) -> Result<PathBuf, anyhow::Error> {
     let pb = PathBuf::from_str(tsc.dir)?;
-    Ok(pb.join(
-        Path::new(filename)
-            .file_name()
-            .unwrap()
-            .to_string_lossy()
-            .replace(" ", "_")
-            .replace(".pem", ".crt"),
-    ))
+    Ok(pb.join(tr_filename(filename)))
 }
 
 fn update_ca(tsc: &TrustStoreMetadata) -> Result<std::process::ExitStatus, anyhow::Error> {
@@ -210,8 +212,9 @@ pub fn append_path(registry: &str, filename: PathBuf) -> Result<(), anyhow::Erro
     registry_lines += &format!("{}\n", basename.to_str().unwrap());
     f.write(registry_lines.as_bytes())?;
     f.flush()?;
+    let path = f.into_temp_path();
 
-    std::fs::rename(f.path(), registry)?;
+    std::fs::rename(path, registry)?;
 
     Ok(())
 }
@@ -236,8 +239,9 @@ pub fn redact_path(registry: &str, filename: PathBuf) -> Result<(), anyhow::Erro
     let mut f = NamedTempFile::new()?;
     f.write(new_registry.join("\n").as_bytes())?;
     f.flush()?;
+    let path = f.into_temp_path();
 
-    std::fs::rename(f.path(), registry)?;
+    std::fs::rename(path, registry)?;
 
     Ok(())
 }
@@ -291,6 +295,8 @@ mod tests {
 
     use tempdir::TempDir;
 
+    use crate::linux::tr_filename;
+
     static LOGGER: Once = Once::new();
 
     fn init_logger() {
@@ -320,7 +326,13 @@ mod tests {
 
             std::fs::write(test_pem.clone(), ca.certificate().to_pem().unwrap()).unwrap();
             super::install_ca(test_pem.to_str().unwrap()).unwrap();
+
+            let s = std::fs::read_to_string("/etc/ca-certificates.conf").unwrap();
+            assert!(s.contains(&tr_filename(filename)));
             super::uninstall_ca(test_pem.to_str().unwrap()).unwrap();
+
+            let s = std::fs::read_to_string("/etc/ca-certificates.conf").unwrap();
+            assert!(!s.contains(&tr_filename(filename)));
         }
     }
 }
