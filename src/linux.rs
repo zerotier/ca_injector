@@ -1,10 +1,12 @@
 use std::{
+    io::Write,
     path::{Path, PathBuf},
     str::FromStr,
 };
 
 use anyhow::anyhow;
 use glob::glob;
+use tempfile::NamedTempFile;
 use which::which;
 
 fn certutil() -> Result<PathBuf, anyhow::Error> {
@@ -101,6 +103,7 @@ fn uninstall_nss(filename: &str) -> Result<(), anyhow::Error> {
 struct TrustStoreMetadata {
     dir: &'static str,
     bin: &'static str,
+    append_path: Option<&'static str>,
     args: Vec<&'static str>,
 }
 
@@ -110,7 +113,19 @@ fn get_trust_store_command() -> Result<TrustStoreMetadata, anyhow::Error> {
             return Ok(TrustStoreMetadata {
                 dir: "/etc/pki/ca-trust/source/anchors",
                 bin: "update-ca-trust",
+                append_path: None,
                 args: vec!["extract"],
+            });
+        }
+    }
+
+    if let Ok(md) = std::fs::metadata("/usr/share/ca-certificates") {
+        if md.is_dir() {
+            return Ok(TrustStoreMetadata {
+                dir: "/usr/share/ca-certificates",
+                bin: "/usr/sbin/update-ca-certificates",
+                append_path: Some("/etc/ca-certificates.conf"),
+                args: vec![],
             });
         }
     }
@@ -120,6 +135,7 @@ fn get_trust_store_command() -> Result<TrustStoreMetadata, anyhow::Error> {
             return Ok(TrustStoreMetadata {
                 dir: "/usr/local/share/ca-certificates",
                 bin: "/usr/sbin/update-ca-certificates",
+                append_path: Some("/etc/ca-certificates.conf"),
                 args: vec![],
             });
         }
@@ -130,6 +146,7 @@ fn get_trust_store_command() -> Result<TrustStoreMetadata, anyhow::Error> {
             return Ok(TrustStoreMetadata {
                 dir: "/etc/ca-certificates/trust-source/anchors",
                 bin: "trust",
+                append_path: None,
                 args: vec!["extract-compat"],
             });
         }
@@ -140,6 +157,7 @@ fn get_trust_store_command() -> Result<TrustStoreMetadata, anyhow::Error> {
             return Ok(TrustStoreMetadata {
                 dir: "/usr/share/pki/trust/anchors",
                 bin: "update-ca-certificates",
+                append_path: None,
                 args: vec![],
             });
         }
@@ -171,6 +189,59 @@ fn update_ca(tsc: &TrustStoreMetadata) -> Result<std::process::ExitStatus, anyho
         .status()?)
 }
 
+pub fn append_path(registry: &str, filename: PathBuf) -> Result<(), anyhow::Error> {
+    let mut registry_lines = std::fs::read_to_string(registry)?;
+    let basename = filename.file_name().unwrap();
+
+    for line in registry_lines.split("\n") {
+        if line == basename {
+            return Ok(());
+        }
+    }
+
+    let mut f = NamedTempFile::new()?;
+
+    log::debug!(
+        "Appending {} with CA {} added",
+        registry,
+        basename.to_str().unwrap()
+    );
+
+    registry_lines += &format!("{}\n", basename.to_str().unwrap());
+    f.write(registry_lines.as_bytes())?;
+    f.flush()?;
+
+    std::fs::rename(f.path(), registry)?;
+
+    Ok(())
+}
+
+pub fn redact_path(registry: &str, filename: PathBuf) -> Result<(), anyhow::Error> {
+    let registry_lines = std::fs::read_to_string(registry)?;
+    let basename = filename.file_name().unwrap();
+    let mut new_registry = Vec::new();
+
+    log::debug!(
+        "Redacting from {} for CA {} (removed)",
+        registry,
+        basename.to_str().unwrap()
+    );
+
+    for line in registry_lines.split("\n") {
+        if line != basename {
+            new_registry.push(line);
+        }
+    }
+
+    let mut f = NamedTempFile::new()?;
+    f.write(new_registry.join("\n").as_bytes())?;
+    f.flush()?;
+
+    std::fs::rename(f.path(), registry)?;
+
+    Ok(())
+}
+
 pub fn install_ca(filename: &str) -> Result<(), anyhow::Error> {
     let tsc = get_trust_store_command()?;
     let new_filename = template_filename(filename, &tsc)?;
@@ -181,7 +252,11 @@ pub fn install_ca(filename: &str) -> Result<(), anyhow::Error> {
         new_filename.display()
     );
 
-    std::fs::copy(filename, new_filename)?;
+    std::fs::copy(filename, new_filename.clone())?;
+
+    if let Some(path) = tsc.append_path {
+        append_path(path, new_filename)?;
+    }
 
     let res = update_ca(&tsc)?;
 
@@ -194,7 +269,12 @@ pub fn install_ca(filename: &str) -> Result<(), anyhow::Error> {
 
 pub fn uninstall_ca(filename: &str) -> Result<(), anyhow::Error> {
     let tsc = get_trust_store_command()?;
-    std::fs::remove_file(template_filename(filename, &tsc)?)?;
+    let new_filename = template_filename(filename, &tsc)?;
+    std::fs::remove_file(new_filename.clone())?;
+
+    if let Some(path) = tsc.append_path {
+        redact_path(path, new_filename)?;
+    }
 
     let res = update_ca(&tsc)?;
 
